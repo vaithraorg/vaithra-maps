@@ -3,487 +3,606 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vaithra Startup Map</title>
+    <title>Vaithra Maps | Real-Time Startup Ecosystem</title>
     
-    <!-- Leaflet CSS & JS for Mapping -->
+    <!-- Fonts: Inter for that clean, modern SaaS look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
+        /* =========================================================
+           CSS VARIABLES (White, Blue, Clean Grays)
+           ========================================================= */
         :root {
-            --primary: #0f172a;
-            --accent: #3b82f6;
-            --accent-hover: #2563eb;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --bg-light: #f8fafc;
-            --text-main: #1e293b;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-            --card-bg: #ffffff;
-            --gold: #fbbf24;
+            --bg-base: #ffffff;
+            --bg-surface: #f8fafc;
+            --bg-surface-hover: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border-light: #e2e8f0;
+            --border-focus: #94a3b8;
+            
+            --blue-primary: #2563eb;
+            --blue-hover: #1d4ed8;
+            --blue-light: #eff6ff;
+            --blue-text: #1e40af;
+            
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-pill: 9999px;
+            
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            --shadow-float: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+            
+            --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-
+        /* =========================================================
+           RESET & TYPOGRAPHY
+           ========================================================= */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
         body {
-            background-color: var(--bg-light);
-            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-surface);
+            color: var(--text-primary);
             display: flex;
             flex-direction: column;
             height: 100vh;
             overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Navigation */
+        h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 700; }
+        
+        /* =========================================================
+           LAYOUT & NAVIGATION (Jakob's Law)
+           ========================================================= */
         nav {
-            background-color: var(--primary);
-            color: white;
-            padding: 1rem 2rem;
+            background-color: var(--bg-base);
+            border-bottom: 1px solid var(--border-light);
+            padding: 0 2rem;
+            height: 72px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             z-index: 1000;
+            flex-shrink: 0;
         }
 
-        nav .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            letter-spacing: 1px;
-            color: white;
+        .brand {
+            font-size: 1.25rem;
+            font-weight: 800;
             text-decoration: none;
-        }
-
-        nav .logo span { color: var(--accent); }
-
-        nav ul {
+            color: var(--text-primary);
             display: flex;
-            list-style: none;
-            gap: 1.5rem;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .brand .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--blue-primary);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
         }
 
+        nav ul { display: flex; list-style: none; gap: 2rem; align-items: center; }
         nav ul li a {
-            color: #cbd5e1;
+            color: var(--text-secondary);
             text-decoration: none;
             font-weight: 500;
-            transition: color 0.2s;
+            font-size: 0.95rem;
+            transition: var(--transition-smooth);
         }
+        nav ul li a:hover, nav ul li a.active-link { color: var(--blue-primary); }
 
-        nav ul li a:hover { color: white; }
+        #app-container { flex: 1; position: relative; overflow: hidden; }
 
-        /* Main App Container */
-        #app {
-            flex: 1;
-            overflow-y: auto;
-            position: relative;
-        }
-
-        /* Views */
         .view {
-            display: none;
-            padding: 2rem;
-            max-width: 1200px;
-            margin: 0 auto;
-            animation: fadeIn 0.3s ease-in-out;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease;
+            overflow-y: auto;
+            background: var(--bg-surface);
         }
+        .view.active { opacity: 1; visibility: visible; }
 
-        .view.active { display: block; }
-
-        /* Map View Specifics */
-        #view-map.active {
-            display: flex;
-            padding: 0;
-            max-width: none;
-            height: 100%;
-        }
-
-        #map {
-            flex: 1;
-            height: 100%;
-            z-index: 1;
-        }
-
-        .map-sidebar {
-            width: 350px;
-            background: var(--card-bg);
-            border-left: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            z-index: 2;
-            box-shadow: -2px 0 10px rgba(0,0,0,0.05);
-        }
-
-        /* Reusable UI Components */
+        /* =========================================================
+           UI COMPONENTS (Fitts's Law & Common Region)
+           ========================================================= */
         .btn {
-            background: var(--accent);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
             font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            border: none;
             text-decoration: none;
-            display: inline-block;
+            /* Fitts's law: min 44px height for tap targets */
+            min-height: 44px; 
         }
 
-        .btn:hover { background: var(--accent-hover); }
+        .btn-primary {
+            background-color: var(--blue-primary);
+            color: white;
+            box-shadow: var(--shadow-sm);
+        }
+        .btn-primary:hover {
+            background-color: var(--blue-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
         .btn-outline {
-            background: transparent;
-            border: 1px solid var(--accent);
-            color: var(--accent);
+            background-color: var(--bg-base);
+            color: var(--blue-primary);
+            border: 1px solid var(--border-light);
+        }
+        .btn-outline:hover {
+            border-color: var(--blue-primary);
+            background-color: var(--blue-light);
         }
 
         .card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            background: var(--bg-base);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition-smooth);
         }
+        .card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
 
-        .sponsored-badge {
-            background: rgba(251, 191, 36, 0.2);
-            color: #b45309;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
+        .badge-live {
+            background-color: var(--blue-light);
+            color: var(--blue-text);
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
             font-size: 0.75rem;
             font-weight: 700;
             text-transform: uppercase;
-            display: inline-block;
-            margin-bottom: 0.5rem;
+            letter-spacing: 0.05em;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        /* Grid Layouts */
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1.5rem;
+        /* =========================================================
+           MAP VIEW (Split Screen Design)
+           ========================================================= */
+        #view-map.active { display: flex; overflow: hidden; padding: 0; }
+        
+        .map-sidebar {
+            width: 400px;
+            background: var(--bg-base);
+            border-right: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.03);
         }
 
-        .hero {
+        .sidebar-header { padding: 24px; border-bottom: 1px solid var(--border-light); }
+        .sidebar-header h2 { font-size: 1.25rem; margin-bottom: 12px; }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-light);
+            background: var(--bg-surface);
+            font-size: 0.95rem;
+            transition: var(--transition-smooth);
+            font-family: inherit;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: var(--blue-primary);
+            background: var(--bg-base);
+            box-shadow: 0 0 0 3px var(--blue-light);
+        }
+
+        .startup-list { flex: 1; overflow-y: auto; padding: 12px; }
+        
+        .startup-list-item {
+            padding: 16px;
+            border-radius: var(--radius-md);
+            margin-bottom: 8px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: var(--transition-smooth);
+        }
+        .startup-list-item:hover { background: var(--bg-surface); border-color: var(--border-light); }
+        .startup-list-item h4 { font-size: 1.05rem; margin-bottom: 4px; }
+        .startup-list-item p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4; }
+
+        #map-container { flex: 1; background: #e5e5e5; z-index: 1; }
+
+        /* =========================================================
+           LEADERBOARD / OUTBID VIEW
+           ========================================================= */
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        
+        .leaderboard-header { text-align: center; margin-bottom: 40px; }
+        .leaderboard-header h1 { font-size: 2.5rem; margin-bottom: 12px; }
+        .leaderboard-header p { color: var(--text-secondary); font-size: 1.1rem; }
+
+        .hero-bid-card {
+            background: linear-gradient(180deg, var(--blue-light) 0%, var(--bg-base) 100%);
+            border: 2px solid var(--blue-primary);
             text-align: center;
-            padding: 4rem 1rem;
-            background: white;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 2rem;
+            padding: 40px 24px;
+            margin-bottom: 32px;
+        }
+        
+        .bid-input-group {
+            display: flex;
+            gap: 12px;
+            max-width: 400px;
+            margin: 24px auto 0;
+        }
+        .bid-input-group input { flex: 1; font-size: 1.1rem; font-weight: 600; }
+
+        .leaderboard-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            background: var(--bg-base);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            margin-bottom: 12px;
+            transition: var(--transition-smooth);
+        }
+        .leaderboard-row:hover { transform: scale(1.01); box-shadow: var(--shadow-md); }
+        
+        .rank-info { display: flex; align-items: center; gap: 20px; }
+        .rank-number {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--border-focus);
+            width: 30px;
+        }
+        .row-1 .rank-number { color: var(--blue-primary); }
+        
+        /* Real-time flash animation */
+        @keyframes flashUpdate {
+            0% { background-color: var(--blue-primary); color: white; transform: scale(1.02); }
+            100% { background-color: var(--bg-base); color: inherit; transform: scale(1); }
+        }
+        .flash-row { animation: flashUpdate 1s ease-out; }
+
+        /* =========================================================
+           TOAST NOTIFICATIONS (Real-time feel)
+           ========================================================= */
+        #toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 9999;
         }
 
-        .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
-        .hero p { font-size: 1.2rem; color: var(--text-muted); margin-bottom: 2rem; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .toast {
+            background: var(--text-primary);
+            color: white;
+            padding: 16px 20px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-float);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            animation: slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 350px;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(120%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateY(10px); }
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
         }
     </style>
 </head>
 <body>
 
+    <!-- TOP NAVIGATION -->
     <nav>
-        <a href="#/" class="logo">VAITHRA<span>MAPS</span></a>
+        <a href="#/map" class="brand"><div class="dot"></div> Vaithra Maps</a>
         <ul>
-            <li><a href="#/map">Map</a></li>
-            <li><a href="#/startups">Startups</a></li>
-            <li><a href="#/leaderboard">Leaderboard</a></li>
-            <li><a href="#/dashboard">Dashboard</a></li>
-            <li><a href="#/admin">Admin</a></li>
+            <li><a href="#/map" class="nav-link">Ecosystem Map</a></li>
+            <li><a href="#/outbid" class="nav-link">Live Outbid</a></li>
+            <li><a href="#/dashboard" class="btn btn-primary" style="color: white; padding: 8px 16px;">Add Startup</a></li>
         </ul>
     </nav>
 
-    <div id="app">
-        <!-- Home View -->
-        <div id="view-home" class="view">
-            <div class="hero">
-                <h1>Discover the Startup Ecosystem.</h1>
-                <p>Explore startups, founders, opportunities, and ecosystem activity.</p>
-                <a href="#/map" class="btn">Explore the Map</a>
-                <a href="#/dashboard" class="btn btn-outline" style="margin-left: 10px;">Add Your Startup</a>
+    <!-- MAIN APP CONTAINER -->
+    <div id="app-container">
+        
+        <!-- MAP VIEW -->
+        <div id="view-map" class="view active">
+            <div class="map-sidebar">
+                <div class="sidebar-header">
+                    <h2>Discover Startups</h2>
+                    <input type="text" id="search-box" class="search-input" placeholder="Search by name, city, or industry..." onkeyup="filterMap()">
+                </div>
+                <div class="startup-list" id="sidebar-list">
+                    <!-- Populated by JS -->
+                </div>
             </div>
-            <h2>Trending Startups (Demo Data)</h2><br>
-            <div class="grid" id="home-startups-grid"></div>
+            <div id="map-container"></div>
         </div>
 
-        <!-- Map View -->
-        <div id="view-map" class="view">
-            <div id="map"></div>
-            <div class="map-sidebar">
-                <div style="padding: 1rem; border-bottom: 1px solid var(--border);">
-                    <h3>Filters</h3>
-                    <select id="map-city-filter" style="width: 100%; padding: 0.5rem; margin-top: 0.5rem;">
-                        <option value="all">All Cities</option>
-                        <option value="Vijayawada">Vijayawada</option>
-                        <option value="Hyderabad">Hyderabad</option>
-                    </select>
+        <!-- LEADERBOARD / OUTBID VIEW -->
+        <div id="view-outbid" class="view">
+            <div class="container">
+                <div class="leaderboard-header">
+                    <div class="badge-live" style="margin-bottom: 16px;">
+                        <span style="display:inline-block; width:6px; height:6px; background:var(--blue-primary); border-radius:50%; animation:pulse 1s infinite;"></span>
+                        Live Bidding
+                    </div>
+                    <h1>Sponsored Visibility</h1>
+                    <p>Compete for the #1 spot on the map and directory. (Position does not imply organic ranking).</p>
                 </div>
-                <div id="sidebar-startups" style="flex: 1; overflow-y: auto; padding: 1rem;">
+
+                <!-- Top Bidder Hero Card -->
+                <div class="card hero-bid-card" id="top-bidder-card">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Rankings List -->
+                <div id="outbid-list">
                     <!-- Populated by JS -->
                 </div>
             </div>
         </div>
 
-        <!-- Startups Directory View -->
-        <div id="view-startups" class="view">
-            <h2>Startup Directory</h2><br>
-            <div class="grid" id="directory-grid"></div>
-        </div>
-
-        <!-- Leaderboard / Bidding View -->
-        <div id="view-leaderboard" class="view">
-            <h2>Sponsored Visibility Leaderboard</h2>
-            <p style="margin-bottom: 2rem; color: var(--text-muted);">Increase your startup's visibility. Paid positioning does not reflect objective quality.</p>
-            
-            <div class="card" style="background: #f8fafc; border: 1px solid var(--gold);">
-                <h3>Current Top Position: <span id="current-top-startup" style="color: var(--accent);">Loading...</span></h3>
-                <p>Highest Bid: ₹<span id="current-highest-bid">0</span></p>
-                <hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border);">
-                <h4>Outbid to claim #1 Visibility</h4>
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <input type="number" id="bid-amount" placeholder="Min. ₹2500" style="padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px;">
-                    <button class="btn" onclick="submitBid()">Place Bid</button>
-                </div>
-                <p id="bid-message" style="margin-top: 10px; font-weight: bold;"></p>
-            </div>
-
-            <div id="leaderboard-list"></div>
-        </div>
-
-        <!-- Dashboard View -->
-        <div id="view-dashboard" class="view">
-            <h2>Founder Dashboard</h2><br>
-            <div class="grid">
-                <div class="card">
-                    <h3>My Startup</h3>
-                    <p>Status: <span style="color: var(--success); font-weight: bold;">Approved</span></p>
-                    <button class="btn btn-outline" style="margin-top: 1rem; width: 100%;">Edit Profile</button>
-                </div>
-                <div class="card">
-                    <h3>Visibility Status</h3>
-                    <p>Current Rank: #2 Organic</p>
-                    <a href="#/leaderboard" class="btn" style="margin-top: 1rem; width: 100%;">Increase Visibility</a>
-                </div>
-                <div class="card">
-                    <h3>Notifications</h3>
-                    <ul style="padding-left: 1.2rem; color: var(--text-muted); margin-top: 1rem;">
-                        <li>Your startup was approved.</li>
-                        <li>Welcome to Vaithra Maps.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <!-- Admin View -->
-        <div id="view-admin" class="view">
-            <h2>Admin Panel</h2><br>
-            <div class="grid">
-                <div class="card">
-                    <h3>Platform Stats</h3>
-                    <p>Total Startups: <span id="admin-startup-count">0</span></p>
-                    <p>Total Founders: 12</p>
-                    <p>Active Bids: ₹<span id="admin-bid-total">0</span></p>
-                </div>
-                <div class="card">
-                    <h3>Pending Approvals</h3>
-                    <p>No startups pending review.</p>
-                </div>
-                <div class="card">
-                    <h3>Bidding Settings</h3>
-                    <p>Min Increment: ₹5</p>
-                    <button class="btn btn-outline" style="margin-top: 1rem; width: 100%;">Adjust Minimums</button>
-                </div>
-            </div>
-        </div>
     </div>
 
+    <!-- TOAST NOTIFICATIONS -->
+    <div id="toast-container"></div>
+
     <script>
-        // --- 1. MOCK DATABASE (Simulating Firestore) ---
+        /**
+         * 1. APP DATA (Mocking Vaithra Ecosystem based on context)
+         */
         const DB = {
             startups: [
-                { id: 's1', name: 'Glowvai', tagline: 'AI-driven diagnostic skin analysis', city: 'Vijayawada', industry: 'HealthTech', lat: 16.5062, lng: 80.6480, visibilityBid: 3000 },
-                { id: 's2', name: 'Vyapaarnet', tagline: 'Digital ecosystem for modern trade', city: 'Vijayawada', industry: 'SaaS', lat: 16.5122, lng: 80.6300, visibilityBid: 1500 },
-                { id: 's3', name: 'Vishvarupa Creations', tagline: 'Media and production house', city: 'Hyderabad', industry: 'Media', lat: 17.3850, lng: 78.4867, visibilityBid: 500 },
-                { id: 's4', name: 'O-Max Media', tagline: 'Next-gen content distribution', city: 'Vijayawada', industry: 'Media', lat: 16.4950, lng: 80.6550, visibilityBid: 0 }
+                { id: 's1', name: 'Glowvai', tagline: 'AI-driven diagnostic facial skin analysis and quick-commerce.', city: 'Vijayawada', industry: 'HealthTech', lat: 16.5062, lng: 80.6480, bid: 4500 },
+                { id: 's2', name: 'Vyapaarnet', tagline: 'Strategic digital ecosystem and holding infrastructure.', city: 'Vijayawada', industry: 'SaaS', lat: 16.5122, lng: 80.6300, bid: 3200 },
+                { id: 's3', name: 'Vaithra', tagline: 'Founder infrastructure layer and credibility network for AP/TS.', city: 'Tirupati', industry: 'Community', lat: 13.6288, lng: 79.4192, bid: 2100 },
+                { id: 's4', name: 'Vishvarupa Creations', tagline: 'Premium media and production partner.', city: 'Hyderabad', industry: 'Media', lat: 17.3850, lng: 78.4867, bid: 1500 },
+                { id: 's5', name: 'O-Max Media', tagline: 'Social media marketing & founder branding agency.', city: 'Vijayawada', industry: 'Agency', lat: 16.4950, lng: 80.6550, bid: 500 }
             ],
-            biddingConfig: {
-                minIncrement: 5
-            }
+            config: { minIncrement: 100 }
         };
 
-        let mapInstance = null;
+        // Current User (Mock)
+        const MY_STARTUP_ID = 's5'; // O-Max Media
+
+        let map = null;
         let mapMarkers = [];
 
-        // --- 2. ROUTING ENGINE ---
+        /**
+         * 2. ROUTING LOGIC
+         */
         function handleRoute() {
-            const hash = window.location.hash || '#/';
-            const route = hash.split('?')[0];
-
-            // Hide all views
+            const hash = window.location.hash || '#/map';
+            
             document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active-link'));
 
-            // Show target view
-            if (route === '#/') showView('view-home', renderHome);
-            else if (route === '#/map') showView('view-map', initMap);
-            else if (route === '#/startups') showView('view-startups', renderStartups);
-            else if (route === '#/leaderboard') showView('view-leaderboard', renderLeaderboard);
-            else if (route === '#/dashboard') showView('view-dashboard', null);
-            else if (route === '#/admin') showView('view-admin', renderAdmin);
-            else showView('view-home', renderHome); // Fallback
+            if (hash === '#/map') {
+                document.getElementById('view-map').classList.add('active');
+                document.querySelector('a[href="#/map"]').classList.add('active-link');
+                initMap();
+            } else if (hash === '#/outbid') {
+                document.getElementById('view-outbid').classList.add('active');
+                document.querySelector('a[href="#/outbid"]').classList.add('active-link');
+                renderLeaderboard();
+            }
         }
-
-        function showView(id, callback) {
-            document.getElementById(id).classList.add('active');
-            if (callback) callback();
-        }
-
         window.addEventListener('hashchange', handleRoute);
         window.addEventListener('load', handleRoute);
 
-        // --- 3. UI RENDERING LOGIC ---
-
-        function generateStartupCard(startup, isSponsored = false) {
-            return `
-                <div class="card">
-                    ${isSponsored ? '<div class="sponsored-badge">Visibility Position</div>' : ''}
-                    <h3>${startup.name}</h3>
-                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">${startup.city} • ${startup.industry}</p>
-                    <p>${startup.tagline}</p>
-                    ${isSponsored ? `<p style="margin-top: 10px; font-weight: bold; font-size: 0.85rem;">Bid: ₹${startup.visibilityBid}</p>` : ''}
-                </div>
-            `;
-        }
-
-        function renderHome() {
-            const grid = document.getElementById('home-startups-grid');
-            // Sort by bid to simulate trending/visibility on home
-            const sorted = [...DB.startups].sort((a, b) => b.visibilityBid - a.visibilityBid).slice(0, 3);
-            grid.innerHTML = sorted.map(s => generateStartupCard(s, s.visibilityBid > 0)).join('');
-        }
-
-        function renderStartups() {
-            const grid = document.getElementById('directory-grid');
-            grid.innerHTML = DB.startups.map(s => generateStartupCard(s)).join('');
-        }
-
-        function renderAdmin() {
-            document.getElementById('admin-startup-count').innerText = DB.startups.length;
-            const totalBids = DB.startups.reduce((sum, s) => sum + s.visibilityBid, 0);
-            document.getElementById('admin-bid-total').innerText = totalBids;
-        }
-
-        // --- 4. MAP LOGIC (Leaflet) ---
+        /**
+         * 3. MAP & SIDEBAR LOGIC (Clean aesthetic)
+         */
         function initMap() {
-            if (!mapInstance) {
-                // Initialize map centered on Vijayawada
-                mapInstance = L.map('map').setView([16.5062, 80.6480], 12);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors'
-                }).addTo(mapInstance);
-            }
+            if (!map) {
+                map = L.map('map-container', { zoomControl: false }).setView([16.5062, 80.6480], 7);
+                L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-            renderMapMarkers('all');
-            
-            document.getElementById('map-city-filter').addEventListener('change', (e) => {
-                renderMapMarkers(e.target.value);
-            });
+                // Using CartoDB Positron for a very clean, light, white/gray map background
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+                }).addTo(map);
+            }
+            renderMapData(DB.startups);
         }
 
-        function renderMapMarkers(cityFilter) {
-            // Clear existing
-            mapMarkers.forEach(m => mapInstance.removeLayer(m));
+        const customIcon = L.divIcon({
+            className: 'custom-pin',
+            html: `<div style="background: var(--blue-primary); width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: var(--shadow-md);"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        });
+
+        function renderMapData(data) {
+            // Clear markers
+            mapMarkers.forEach(m => map.removeLayer(m));
             mapMarkers = [];
             
-            const sidebar = document.getElementById('sidebar-startups');
+            const sidebar = document.getElementById('sidebar-list');
             sidebar.innerHTML = '';
 
-            const filtered = cityFilter === 'all' 
-                ? DB.startups 
-                : DB.startups.filter(s => s.city === cityFilter);
+            // Sort by bid for the sidebar
+            const sorted = [...data].sort((a, b) => b.bid - a.bid);
 
-            // Re-center map based on city
-            if (cityFilter === 'Vijayawada') mapInstance.setView([16.5062, 80.6480], 12);
-            if (cityFilter === 'Hyderabad') mapInstance.setView([17.3850, 78.4867], 12);
-
-            filtered.forEach(s => {
-                // Add Marker
-                const marker = L.marker([s.lat, s.lng]).addTo(mapInstance);
-                marker.bindPopup(`<b>${s.name}</b><br>${s.tagline}`);
+            sorted.forEach((s, index) => {
+                // Map Marker
+                const marker = L.marker([s.lat, s.lng], { icon: customIcon }).addTo(map);
+                marker.bindPopup(`
+                    <div style="font-family: 'Inter'; padding: 4px;">
+                        <strong style="font-size: 1.1rem; color: var(--text-primary);">${s.name}</strong><br>
+                        <span style="color: var(--text-secondary); font-size: 0.85rem;">${s.industry} • ${s.city}</span>
+                    </div>
+                `);
                 mapMarkers.push(marker);
 
-                // Add Sidebar Entry
+                // Sidebar Item
                 sidebar.innerHTML += `
-                    <div class="card" style="padding: 1rem; cursor: pointer;" onclick="mapInstance.setView([${s.lat}, ${s.lng}], 15)">
-                        <h4 style="margin-bottom: 0.2rem;">${s.name}</h4>
-                        <p style="font-size: 0.8rem; color: var(--text-muted);">${s.industry}</p>
+                    <div class="startup-list-item" onclick="flyToMap(${s.lat}, ${s.lng})">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                            <h4>${s.name}</h4>
+                            ${s.bid > 0 ? `<span class="badge-live" style="font-size:0.65rem; background:var(--bg-base); border:1px solid var(--border-light);">#${index+1}</span>` : ''}
+                        </div>
+                        <p>${s.tagline}</p>
+                        <p style="margin-top: 8px; font-size: 0.8rem; font-weight: 600; color: var(--blue-primary);">${s.industry}</p>
                     </div>
                 `;
             });
         }
 
-        // --- 5. PAID VISIBILITY / BIDDING SYSTEM ---
-        function getRankedStartups() {
-            return [...DB.startups].sort((a, b) => b.visibilityBid - a.visibilityBid);
+        function filterMap() {
+            const query = document.getElementById('search-box').value.toLowerCase();
+            const filtered = DB.startups.filter(s => 
+                s.name.toLowerCase().includes(query) || 
+                s.city.toLowerCase().includes(query) || 
+                s.industry.toLowerCase().includes(query)
+            );
+            renderMapData(filtered);
         }
 
-        function renderLeaderboard() {
-            const ranked = getRankedStartups();
-            const top = ranked[0];
-            
-            document.getElementById('current-top-startup').innerText = top.name;
-            document.getElementById('current-highest-bid').innerText = top.visibilityBid;
-            
-            const minNextBid = top.visibilityBid + DB.biddingConfig.minIncrement;
-            const bidInput = document.getElementById('bid-amount');
-            bidInput.placeholder = `Min. ₹${minNextBid}`;
-            bidInput.min = minNextBid;
+        function flyToMap(lat, lng) {
+            map.flyTo([lat, lng], 13, { duration: 1.5, easeLinearity: 0.25 });
+        }
 
-            const list = document.getElementById('leaderboard-list');
-            list.innerHTML = ranked.map((s, index) => `
-                <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <div class="sponsored-badge">#${index + 1} Position</div>
-                        <h3 style="margin-top: 5px;">${s.name}</h3>
-                        <p style="color: var(--text-muted); font-size: 0.85rem;">${s.city} • ${s.industry}</p>
+        /**
+         * 4. LIVE OUTBID / LEADERBOARD LOGIC
+         */
+        function renderLeaderboard(flashedId = null) {
+            const ranked = [...DB.startups].sort((a, b) => b.bid - a.bid);
+            const top = ranked[0];
+            const myStartup = DB.startups.find(s => s.id === MY_STARTUP_ID);
+            
+            const minNextBid = top.bid + DB.config.minIncrement;
+
+            // Render Hero (Top Spot)
+            document.getElementById('top-bidder-card').innerHTML = `
+                <div class="badge-live" style="background: white; margin-bottom: 16px;">👑 Current Leader</div>
+                <h2 style="font-size: 2rem; margin-bottom: 8px;">${top.name}</h2>
+                <p style="color: var(--text-secondary); font-size: 1.1rem; margin-bottom: 24px;">Highest Bid: <strong style="color: var(--text-primary);">₹${top.bid.toLocaleString()}</strong></p>
+                
+                <div class="card" style="background: white; text-align: left; padding: 20px;">
+                    <h4 style="margin-bottom: 12px; font-size: 1rem;">Outbid to claim #1 for ${myStartup.name}</h4>
+                    <div class="bid-input-group" style="margin: 0; max-width: 100%;">
+                        <input type="number" id="bid-amount" class="search-input" placeholder="Min. ₹${minNextBid.toLocaleString()}" min="${minNextBid}" step="100">
+                        <button class="btn btn-primary" onclick="submitBid()">Place Bid</button>
+                    </div>
+                </div>
+            `;
+
+            // Render List
+            const listHtml = ranked.map((s, index) => `
+                <div class="leaderboard-row row-${index+1} ${s.id === flashedId ? 'flash-row' : ''}" id="row-${s.id}">
+                    <div class="rank-info">
+                        <div class="rank-number">#${index + 1}</div>
+                        <div>
+                            <h3 style="font-size: 1.1rem; margin-bottom: 4px;">${s.name} ${s.id === MY_STARTUP_ID ? '<span style="color: var(--text-secondary); font-weight: normal; font-size: 0.9rem;">(You)</span>' : ''}</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);">${s.city} • ${s.industry}</p>
+                        </div>
                     </div>
                     <div style="text-align: right;">
-                        <span style="font-size: 1.2rem; font-weight: bold; color: var(--accent);">₹${s.visibilityBid}</span>
+                        <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">₹${s.bid.toLocaleString()}</div>
                     </div>
                 </div>
             `).join('');
+            
+            document.getElementById('outbid-list').innerHTML = listHtml;
         }
 
         function submitBid() {
-            const ranked = getRankedStartups();
-            const currentHighest = ranked[0].visibilityBid;
-            const minRequired = currentHighest + DB.biddingConfig.minIncrement;
-            
+            const ranked = [...DB.startups].sort((a, b) => b.bid - a.bid);
+            const minRequired = ranked[0].bid + DB.config.minIncrement;
             const inputVal = parseInt(document.getElementById('bid-amount').value);
-            const msgEl = document.getElementById('bid-message');
 
             if (isNaN(inputVal) || inputVal < minRequired) {
-                msgEl.style.color = 'var(--warning)';
-                msgEl.innerText = `Error: Bid must be at least ₹${minRequired}`;
+                showToast(`Bid must be at least ₹${minRequired.toLocaleString()}`, "error");
                 return;
             }
 
-            // Simulate securely updating backend for "My Startup" (assuming User owns s4 for demo)
-            const myStartup = DB.startups.find(s => s.id === 's4'); 
-            myStartup.visibilityBid = inputVal;
+            // Update data
+            const myStartup = DB.startups.find(s => s.id === MY_STARTUP_ID);
+            myStartup.bid = inputVal;
             
-            msgEl.style.color = 'var(--success)';
-            msgEl.innerText = `Success! Payment confirmed. ${myStartup.name} is now #1.`;
-            document.getElementById('bid-amount').value = '';
-
-            // Re-render
-            setTimeout(() => {
-                msgEl.innerText = '';
-                renderLeaderboard();
-            }, 1500);
+            showToast(`Success! ${myStartup.name} is now #1`, "success");
+            renderLeaderboard(MY_STARTUP_ID); // Pass ID to trigger flash animation
+            
+            // Re-render map sidebar if in background
+            if(map) renderMapData(DB.startups);
         }
+
+        /**
+         * 5. TOAST & REAL-TIME SIMULATION
+         */
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            
+            let icon = '🔔';
+            if(type === 'success') icon = '✅';
+            if(type === 'error') icon = '⚠️';
+            if(type === 'live') icon = '🔥';
+
+            toast.innerHTML = `<span style="font-size: 1.2rem;">${icon}</span> <span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'fadeOut 0.3s forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Simulate random ecosystem activity to make it feel alive
+        setInterval(() => {
+            // 30% chance every 10 seconds to simulate a live bid
+            if(Math.random() > 0.7 && window.location.hash === '#/outbid') {
+                const competitors = DB.startups.filter(s => s.id !== MY_STARTUP_ID);
+                const randomStartup = competitors[Math.floor(Math.random() * competitors.length)];
+                
+                // They outbid the current #1
+                const currentTopBid = [...DB.startups].sort((a, b) => b.bid - a.bid)[0].bid;
+                randomStartup.bid = currentTopBid + 200;
+                
+                showToast(`Live Bid: ${randomStartup.name} just bid ₹${randomStartup.bid.toLocaleString()}`, "live");
+                renderLeaderboard(randomStartup.id);
+            }
+        }, 12000);
+
     </script>
 </body>
 </html>
